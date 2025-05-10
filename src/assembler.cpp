@@ -2,7 +2,7 @@
 #include "../include/tree.h"
 
 #include <cstdio>
-#include <string.h>
+#include <cstdlib>
 
 
 
@@ -12,6 +12,8 @@ constexpr int OperatorMinus = 1;
 constexpr int OperatorMul = 2;
 constexpr int OperatorDiv = 3;
 
+
+constexpr size_t TranslatedStringsMaxLenght = 32;
 
 
 
@@ -32,38 +34,26 @@ static inline constexpr bool is_number(const char& c)
 
 TreeNode* CreateOperatorNode(const char& c, TreeNode* pParent) 
 {
+    pParent->Operator = EOperator;
+
+
     if (c == '+') {
-        return new TreeNode {
-            pParent,
-            nullptr,
-            nullptr,
-            EOperator,
-            OperatorAdd
-        };
+        pParent->Value = OperatorAdd;
     } else if (c == '-') {
-        return new TreeNode {
-            pParent,
-            nullptr,
-            nullptr,
-            EOperator,
-            OperatorMinus
-        };
+        pParent->Value = OperatorMinus;
     } else if (c == '*') {
-        return new TreeNode {
-            pParent,
-            nullptr,
-            nullptr,
-            EOperator,
-            OperatorMul
-        };
+        pParent->Value = OperatorMul;
+    } else {
+        pParent->Value = OperatorDiv;
     }
         
+
     return new TreeNode {
         pParent,
         nullptr,
         nullptr,
-        EOperator,
-        OperatorDiv
+        ENone,
+        0
     };
 }
 
@@ -84,12 +74,11 @@ TreeNode* CreateNumberNode(TreeNode* pParent)  {
 
 
 
-char* TranslateNumber(TreeNode*) 
+char* TranslateNumber(TreeNode* pNode) 
 {
-    char* pAsm = new char[128];
+    char* pAsm = new char[TranslatedStringsMaxLenght];
 
-    strcpy(pAsm, "xor eax, eax\n");
-    strcat(pAsm, "mov eax, 69\n");
+    sprintf(pAsm, "mov eax, %d\n", pNode->Value);
 
     return pAsm;
 }
@@ -99,9 +88,9 @@ char* TranslateNumber(TreeNode*)
 
 char* TranslateAdd(TreeNode*) 
 {
-    char* pAsm = new char[128];
+    char* pAsm = new char[TranslatedStringsMaxLenght];
 
-    pAsm[0] = 0;
+    sprintf(pAsm, "add eax, eax\n");
 
     return pAsm;
 }
@@ -155,14 +144,35 @@ char* TranslateToAsm(const char* pFileContent)
     pCurrent = pHead;
 
     while (pCurrent) {
-        if (pCurrent->Left->Operator == ENumber) {
-            asmContent.AddStringSlice(TranslateNumber(pCurrent->Left), 128);
-            
-            pCurrent = pCurrent->Right;
-            continue;
-        }
+        if (pCurrent->Operator == EOperator) {
 
-        asmContent.AddStringSlice(TranslateAdd(pCurrent), 128);
+            if (pCurrent->Left && 
+                pCurrent->Left->Operator == ENumber) 
+            {
+                asmContent.AddStringSlice(
+                        TranslateNumber(pCurrent->Left),
+                        TranslatedStringsMaxLenght
+                );
+            }
+
+
+            if (pCurrent->Right && 
+                pCurrent->Right->Left->Operator == ENumber) 
+            {
+                asmContent.AddStringSlice(
+                        TranslateNumber(pCurrent->Right->Left),
+                        TranslatedStringsMaxLenght
+                );
+
+                pCurrent->Right->Left = nullptr;
+            }
+
+
+            asmContent.AddStringSlice(
+                    TranslateAdd(pCurrent),
+                    TranslatedStringsMaxLenght
+            );
+        }
 
         pCurrent = pCurrent->Right;
     }
