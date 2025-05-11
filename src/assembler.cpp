@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <stdexcept>
 
 
 
@@ -104,7 +105,7 @@ char* ELang::RegistersAllocator::AllocRegister()
 void ELang::RegistersAllocator::FreeRegister()
 {
     if (m_uAlloced-- == 0) {
-        throw; // TODO
+        throw std::invalid_argument("BCA"); // TODO
     }
 }
 
@@ -113,7 +114,7 @@ void ELang::RegistersAllocator::FreeRegister()
 char* ELang::RegistersAllocator::GetNthFromBack(const size_t& uN)
 {
     if (uN > m_uAlloced) {
-        throw; // TODO
+        return m_pRegistersNames[m_uAlloced];
     }
 
     return m_pRegistersNames[m_uAlloced - uN];
@@ -230,18 +231,6 @@ static void HandleOperator(TreeNode* pCurrent,
                            ELang::RegistersAllocator& allocator,
                            ELang::DynamicAlloc<char, 256>& asmContent)
 {
-    if (pCurrent &&
-        pCurrent->Right &&
-        get_priority(pCurrent->Value) < get_priority(pCurrent->Right->Value))
-    {
-        asmContent.AddStringSlice(
-                NodesToAsm(&pCurrent->Right, allocator),
-                2048
-        );
-    }
-
-
-
     if (pCurrent->Left && 
         pCurrent->Left->Operator == ENumber) 
     {
@@ -251,8 +240,28 @@ static void HandleOperator(TreeNode* pCurrent,
         );
     }
 
+
+
+
+
+    if (pCurrent && 
+        pCurrent->Right &&
+        get_priority(pCurrent->Right->Value) > get_priority(pCurrent->Value))
+    {
+        asmContent.AddStringSlice(
+                NodesToAsm(&pCurrent->Right, allocator),
+                2048
+        );
+    }
+
+
+
+
+
+
     if (pCurrent->Right && 
-            pCurrent->Right->Left->Operator == ENumber) 
+        pCurrent->Right->Left && 
+        pCurrent->Right->Left->Operator == ENumber) 
     {
         asmContent.AddStringSlice(
                 TranslateNumber(pCurrent->Right->Left, allocator),
@@ -281,6 +290,8 @@ static void HandleOperator(TreeNode* pCurrent,
                 TranslatedStringsMaxLenght
         );
     } 
+
+    pCurrent->Operator = ENone;
 }
 
 
