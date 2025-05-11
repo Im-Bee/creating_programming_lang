@@ -4,13 +4,12 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <stdexcept>
 
 
 
 
 constexpr int OperatorAdd = 0;
-constexpr int OperatorMinus = 1;
+constexpr int OperatorSub = 1;
 constexpr int OperatorMul = 2;
 constexpr int OperatorDiv = 3;
 
@@ -42,21 +41,21 @@ static char* NodesToAsm(TreeNode** pHead, ELang::RegistersAllocator& allocator);
 
 // Functions for checking equality -------------------------------------------------------------------------------------
 
-static inline constexpr bool is_operator(const char& c) 
+static inline constexpr bool IsOperator(const char& c) 
 {
     return c == '+' || c == '-' || c == '*' || c == '\\';
 }
 
 
 
-static inline constexpr bool is_number(const char& c) 
+static inline constexpr bool IsNumber(const char& c) 
 {
     return c >= '0' && c <= '9';
 }
 
 
 
-static inline int get_priority(const int& nodeOperator)
+static inline int GetPriority(const int& nodeOperator)
 {
     if (nodeOperator == OperatorMul || nodeOperator == OperatorDiv) {
         return 2;
@@ -135,7 +134,7 @@ static TreeNode* CreateOperatorNode(const char& c, TreeNode* pParent, TreeNode*)
     if (c == '+') {
         pParent->Value = OperatorAdd;
     } else if (c == '-') {
-        pParent->Value = OperatorMinus;
+        pParent->Value = OperatorSub;
     } else if (c == '*') {
         pParent->Value = OperatorMul;
     } else {
@@ -196,7 +195,7 @@ static char* TranslateAdd(ELang::RegistersAllocator& allocator)
 
 
 
-static char* TranslateMinus(ELang::RegistersAllocator& allocator) 
+static char* TranslateSub(ELang::RegistersAllocator& allocator) 
 {
     char* pAsm = new char[TranslatedStringsMaxLenght];
 
@@ -214,6 +213,19 @@ static char* TranslateMul(ELang::RegistersAllocator& allocator)
     char* pAsm = new char[TranslatedStringsMaxLenght];
 
     sprintf(pAsm, "imul %s, %s\n", allocator.GetNthFromBack(2), allocator.GetNthFromBack(1));
+
+    allocator.FreeRegister();
+
+    return pAsm;
+}
+
+
+
+static char* TranslateDiv(ELang::RegistersAllocator& allocator) 
+{
+    char* pAsm = new char[TranslatedStringsMaxLenght];
+
+    sprintf(pAsm, "idiv %s, %s\n", allocator.GetNthFromBack(2), allocator.GetNthFromBack(1));
 
     allocator.FreeRegister();
 
@@ -246,7 +258,7 @@ static void HandleOperator(TreeNode* pCurrent,
 
     if (pCurrent && 
         pCurrent->Right &&
-        get_priority(pCurrent->Right->Value) > get_priority(pCurrent->Value))
+        GetPriority(pCurrent->Right->Value) > GetPriority(pCurrent->Value))
     {
         asmContent.AddStringSlice(
                 NodesToAsm(&pCurrent->Right, allocator),
@@ -266,8 +278,8 @@ static void HandleOperator(TreeNode* pCurrent,
                 TranslateNumber(pCurrent->Right->Left, allocator),
                 TranslatedStringsMaxLenght
         );
-
-        pCurrent->Right->Left = nullptr;
+            
+        DestroyLeaf(&pCurrent->Right->Left);
     }
 
 
@@ -278,9 +290,9 @@ static void HandleOperator(TreeNode* pCurrent,
                 TranslateAdd(allocator),
                 TranslatedStringsMaxLenght
         );
-    } else if (pCurrent->Value == OperatorMinus) {
+    } else if (pCurrent->Value == OperatorSub) {
         asmContent.AddStringSlice(
-                TranslateMinus(allocator),
+                TranslateSub(allocator),
                 TranslatedStringsMaxLenght
         );
     } else if (pCurrent->Value == OperatorMul) {
@@ -288,7 +300,12 @@ static void HandleOperator(TreeNode* pCurrent,
                 TranslateMul(allocator),
                 TranslatedStringsMaxLenght
         );
-    } 
+    } else if (pCurrent->Value == OperatorDiv) {
+        asmContent.AddStringSlice(
+                TranslateDiv(allocator),
+                TranslatedStringsMaxLenght
+        );
+    }
 
     pCurrent->Operator = ENone;
 }
@@ -310,13 +327,13 @@ static char* NodesToAsm(TreeNode** pHead, ELang::RegistersAllocator& allocator)
 
             if (pCurrent && 
                 pCurrent->Right &&
-                get_priority(pCurrent->Right->Value) < get_priority(pCurrent->Value))
+                GetPriority(pCurrent->Right->Value) < GetPriority(pCurrent->Value))
             {
                 break;
             }
 
         }
-
+    
         pCurrent = pCurrent->Right;
     }
 
@@ -346,7 +363,7 @@ char* TranslateToAsm(const char* pFileContent)
     {
         const char& c = pFileContent[i];
 
-        if (is_operator(c)) {
+        if (IsOperator(c)) {
             if (!pCurrent->Left) {
                 perror("Stacked operators");
                 
@@ -359,7 +376,7 @@ char* TranslateToAsm(const char* pFileContent)
             continue;
         }
 
-        if (is_number(c)) {
+        if (IsNumber(c)) {
             if (!pCurrent->Left) {
                 pCurrent->Left = CreateNumberNode(pCurrent);
             }

@@ -28,6 +28,9 @@ extern "C" {
 #endif // !__cplusplus
 
 
+void DestroyLeaf(TreeNode** pLeaf);
+
+
 void DestroyTreeNodes(TreeNode* pHead);
 
 
