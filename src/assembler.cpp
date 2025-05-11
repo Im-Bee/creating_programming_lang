@@ -105,7 +105,7 @@ char* ELang::RegistersAllocator::AllocRegister()
 void ELang::RegistersAllocator::FreeRegister()
 {
     if (m_uAlloced-- == 0) {
-        throw std::invalid_argument("BCA"); // TODO
+        throw; // TODO
     }
 }
 
@@ -258,7 +258,6 @@ static void HandleOperator(TreeNode* pCurrent,
 
 
 
-
     if (pCurrent->Right && 
         pCurrent->Right->Left && 
         pCurrent->Right->Left->Operator == ENumber) 
@@ -308,6 +307,14 @@ static char* NodesToAsm(TreeNode** pHead, ELang::RegistersAllocator& allocator)
     while (pCurrent) {
         if (pCurrent->Operator == EOperator) {
             HandleOperator(pCurrent, allocator, asmContent);
+
+            if (pCurrent && 
+                pCurrent->Right &&
+                get_priority(pCurrent->Right->Value) < get_priority(pCurrent->Value))
+            {
+                break;
+            }
+
         }
 
         pCurrent = pCurrent->Right;
