@@ -49,7 +49,12 @@ class RegistersAllocator
 
         void FreeRegister();
 
+        char* GetCurrentRegister();
+
         char* GetNthFromBack(const size_t& uN);
+
+    private:
+        char* PutOnStack();
 
     private:
         uint8_t m_uAmountOfRegisters;

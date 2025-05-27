@@ -2,6 +2,8 @@
 #define TREE_H
 
 
+typedef unsigned char TreeBool;
+
 
 typedef enum TreeTypes {
     ENone = 1,
@@ -26,6 +28,18 @@ typedef struct TreeNode {
 #ifdef __cplusplus
 extern "C" {
 #endif // !__cplusplus
+
+
+TreeNode* GetLeft(TreeNode* pNode);
+
+
+TreeNode* GetRight(TreeNode* pNode);
+
+
+TreeBool EqTreeType(TreeNode* pNode, TreeTypes type);
+
+
+TreeBool EqValue(TreeNode* pNode, int value);
 
 
 void DestroyLeaf(TreeNode** pLeaf);

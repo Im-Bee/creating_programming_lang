@@ -55,13 +55,17 @@ static inline constexpr bool IsNumber(const char& c)
 
 
 
-static inline int GetPriority(const int& nodeOperator)
+static inline int GetPriority(TreeNode* pNode)
 {
-    if (nodeOperator == OperatorMul || nodeOperator == OperatorDiv) {
-        return 2;
+    if (!pNode) {
+        return -1;
     }
 
-    return 0;
+    if (pNode->Value == OperatorMul || pNode->Value == OperatorDiv) {
+        return 2;
+    } else {
+        return 0;
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -76,7 +80,8 @@ static inline int GetPriority(const int& nodeOperator)
 ELang::RegistersAllocator::~RegistersAllocator() 
 {
     if (m_pRegistersNames) {
-        for (size_t i = 0; i < m_uAmountOfRegisters; ++i) {
+        for (size_t i = 0; i < m_uAmountOfRegisters; ++i) 
+        {
             if (!m_pRegistersNames[i]) {
                 continue;
             }
@@ -93,22 +98,35 @@ ELang::RegistersAllocator::~RegistersAllocator()
 char* ELang::RegistersAllocator::AllocRegister() 
 {
     if (m_uAlloced >= m_uAmountOfRegisters) {
-        throw; // TODO
+        return PutOnStack();
     }
 
-    return m_pRegistersNames[m_uAlloced++];   
+    char* pAsm = new char[TranslatedStringsMaxLenght];
+    pAsm[0] = 0;
+
+    ++m_uAlloced;
+
+    return pAsm;
 }
 
 
 
 void ELang::RegistersAllocator::FreeRegister()
 {
-    if (m_uAlloced-- == 0) {
+    if (!m_uAlloced--) {
         throw; // TODO
     }
 }
 
 
+char* ELang::RegistersAllocator::GetCurrentRegister()
+{
+    if (!m_uAlloced) {
+        throw; // TODO
+    }
+
+    return m_pRegistersNames[m_uAlloced % m_uAmountOfRegisters - 1];
+}
 
 char* ELang::RegistersAllocator::GetNthFromBack(const size_t& uN)
 {
@@ -116,8 +134,22 @@ char* ELang::RegistersAllocator::GetNthFromBack(const size_t& uN)
         return m_pRegistersNames[m_uAlloced];
     }
 
-    return m_pRegistersNames[m_uAlloced - uN];
+    return m_pRegistersNames[m_uAlloced % m_uAmountOfRegisters - uN];
 }
+
+
+char* ELang::RegistersAllocator::PutOnStack()
+{
+    char* pAsm = new char[TranslatedStringsMaxLenght];
+    pAsm[0] = 0;
+
+    
+
+
+
+    return pAsm;
+}
+
 
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -127,20 +159,32 @@ char* ELang::RegistersAllocator::GetNthFromBack(const size_t& uN)
 
 // Nodes creation ------------------------------------------------------------------------------------------------------
 
-static TreeNode* CreateOperatorNode(const char& c, TreeNode* pParent, TreeNode*) 
+static TreeNode* CreateOperatorNode(const char&     c, 
+                                          TreeNode* pParent) 
 {
     pParent->Operator = EOperator;
 
-    if (c == '+') {
-        pParent->Value = OperatorAdd;
-    } else if (c == '-') {
-        pParent->Value = OperatorSub;
-    } else if (c == '*') {
-        pParent->Value = OperatorMul;
-    } else {
-        pParent->Value = OperatorDiv;
+    switch (c) {
+        case '+':
+            pParent->Value = OperatorAdd;
+            break;
+
+        case '-':
+            pParent->Value = OperatorSub;
+            break;
+
+        case '*':
+            pParent->Value = OperatorMul;
+            break;
+
+        case '/':
+            pParent->Value = OperatorDiv;
+            break;
+
+        default:
+            throw; // TODO
+    
     }
-        
 
     return new TreeNode {
         pParent,
@@ -171,11 +215,14 @@ static TreeNode* CreateNumberNode(TreeNode* pParent)  {
 
 // Translation to assembly ---------------------------------------------------------------------------------------------
 
-static char* TranslateNumber(TreeNode* pNode, ELang::RegistersAllocator& allocator) 
+static char* TranslateNumberAlloc(TreeNode* pNode, ELang::RegistersAllocator& allocator) 
 {
     char* pAsm = new char[TranslatedStringsMaxLenght];
+    
+    char* pRegisterAllocation = allocator.AllocRegister();
+    sprintf(pAsm, "%smov %s, %d\n", pRegisterAllocation, allocator.GetCurrentRegister(), pNode->Value);
 
-    sprintf(pAsm, "mov %s, %d\n", allocator.AllocRegister(), pNode->Value);
+    delete [] pRegisterAllocation;
 
     return pAsm;
 }
@@ -243,41 +290,30 @@ static void HandleOperator(TreeNode* pCurrent,
                            ELang::RegistersAllocator& allocator,
                            ELang::DynamicAlloc<char, 256>& asmContent)
 {
-    if (pCurrent->Left && 
-        pCurrent->Left->Operator == ENumber) 
+    if (EqTreeType(pCurrent->Left, ENumber)) 
     {
-        asmContent.AddStringSlice(
-                TranslateNumber(pCurrent->Left, allocator),
-                TranslatedStringsMaxLenght
-        );
+        delete [] asmContent.AddStringSlice(TranslateNumberAlloc(pCurrent->Left, allocator),
+                                            TranslatedStringsMaxLenght);
     }
 
 
 
 
 
-    if (pCurrent && 
-        pCurrent->Right &&
-        GetPriority(pCurrent->Right->Value) > GetPriority(pCurrent->Value))
+    if (GetPriority(GetRight(pCurrent)) > GetPriority(pCurrent))
     {
-        asmContent.AddStringSlice(
-                NodesToAsm(&pCurrent->Right, allocator),
-                2048
-        );
+        delete [] asmContent.AddStringSlice(NodesToAsm(&pCurrent->Right, allocator),
+                                            2048);
     }
 
 
 
 
 
-    if (pCurrent->Right && 
-        pCurrent->Right->Left && 
-        pCurrent->Right->Left->Operator == ENumber) 
+    if (EqTreeType(GetLeft(GetRight(pCurrent)), ENumber)) 
     {
-        asmContent.AddStringSlice(
-                TranslateNumber(pCurrent->Right->Left, allocator),
-                TranslatedStringsMaxLenght
-        );
+        delete [] asmContent.AddStringSlice(TranslateNumberAlloc(pCurrent->Right->Left, allocator),
+                                            TranslatedStringsMaxLenght);
             
         DestroyLeaf(&pCurrent->Right->Left);
     }
@@ -285,27 +321,28 @@ static void HandleOperator(TreeNode* pCurrent,
 
 
 
-    if (pCurrent->Value == OperatorAdd) {
-        asmContent.AddStringSlice(
-                TranslateAdd(allocator),
-                TranslatedStringsMaxLenght
-        );
-    } else if (pCurrent->Value == OperatorSub) {
-        asmContent.AddStringSlice(
-                TranslateSub(allocator),
-                TranslatedStringsMaxLenght
-        );
-    } else if (pCurrent->Value == OperatorMul) {
-        asmContent.AddStringSlice(
-                TranslateMul(allocator),
-                TranslatedStringsMaxLenght
-        );
-    } else if (pCurrent->Value == OperatorDiv) {
-        asmContent.AddStringSlice(
-                TranslateDiv(allocator),
-                TranslatedStringsMaxLenght
-        );
+    switch (pCurrent->Value) {
+        case OperatorAdd:
+            delete [] asmContent.AddStringSlice(TranslateAdd(allocator),
+                                                TranslatedStringsMaxLenght);
+            break;
+        case OperatorSub:
+            delete [] asmContent.AddStringSlice(TranslateSub(allocator),
+                                                TranslatedStringsMaxLenght);
+            break;
+        case OperatorMul:
+            delete [] asmContent.AddStringSlice(TranslateMul(allocator),
+                                                TranslatedStringsMaxLenght);
+            break;
+        case OperatorDiv:
+            delete [] asmContent.AddStringSlice(TranslateDiv(allocator),
+                                                TranslatedStringsMaxLenght);
+            break;
+
+        default:
+            throw; // TODO:
     }
+
 
     pCurrent->Operator = ENone;
 }
@@ -321,17 +358,15 @@ static char* NodesToAsm(TreeNode** pHead, ELang::RegistersAllocator& allocator)
 
     TreeNode* pCurrent = *pHead;
 
-    while (pCurrent) {
-        if (pCurrent->Operator == EOperator) {
+    while (pCurrent) 
+    {
+        if (pCurrent->Operator == EOperator) 
+        {
             HandleOperator(pCurrent, allocator, asmContent);
 
-            if (pCurrent && 
-                pCurrent->Right &&
-                GetPriority(pCurrent->Right->Value) < GetPriority(pCurrent->Value))
-            {
+            if (GetPriority(GetRight(pCurrent)) < GetPriority(pCurrent)) {
                 break;
             }
-
         }
     
         pCurrent = pCurrent->Right;
@@ -370,7 +405,7 @@ char* TranslateToAsm(const char* pFileContent)
                 return nullptr;
             }
 
-            pCurrent->Right = CreateOperatorNode(c, pCurrent, pHead);
+            pCurrent->Right = CreateOperatorNode(c, pCurrent);
             pCurrent = pCurrent->Right;
 
             continue;
@@ -387,10 +422,15 @@ char* TranslateToAsm(const char* pFileContent)
     }
 
     pCurrent = pHead;
+
+
     ELang::RegistersAllocator allocator(Registers);
     char* pContent = NodesToAsm(&pCurrent, allocator);
+
+
     DestroyTreeNodes(pHead);
     
+
     return pContent;
 }
 

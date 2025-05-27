@@ -131,6 +131,7 @@ class DynamicAlloc
         {
             if (m_uUsed && m_pBuffer) {
                 DestroyAlloc(m_pBuffer, m_uUsed);
+                m_uUsed = 0;
             }
 
             if (m_pBuffer) {
@@ -149,7 +150,7 @@ class DynamicAlloc
 
 
     public:
-        void AddSlice(Type* pBeg, size_t uAmount) 
+        Type* AddSlice(Type* pBeg, size_t uAmount) 
         {
             if (uAmount + m_uUsed >= m_uBufferWidthType) {
                 CalcNewWidth(sizeof(Type), uAmount, m_uBufferWidthBytes, m_uBufferWidthType);
@@ -162,11 +163,13 @@ class DynamicAlloc
             CopySlice(m_pBuffer, m_uUsed, pBeg, uAmount);
             
             m_uUsed += uAmount;
+
+            return pBeg;
         }
         
 
 
-        void AddStringSlice(Type* pBeg, size_t uMaxAmount) 
+        Type* AddStringSlice(Type* pBeg, size_t uMaxAmount) 
         {
             if (uMaxAmount + m_uUsed >= m_uBufferWidthType) {
                 CalcNewWidth(sizeof(Type), uMaxAmount, m_uBufferWidthBytes, m_uBufferWidthType);
@@ -177,6 +180,8 @@ class DynamicAlloc
             }
 
             m_uUsed += CopyStringSlice(m_pBuffer, m_uUsed, pBeg, uMaxAmount);
+            
+            return pBeg;
         }
 
 
